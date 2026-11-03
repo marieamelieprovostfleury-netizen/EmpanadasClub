@@ -57,7 +57,18 @@ const P=()=>Object.assign({name:"",end:"2026-11-30",launch:"2026-12-01",cover:1}
 function autoP(){const a=pl();if(!a.length){curP="";return}if(S.periods[curP])return;const lim=new Date(Date.now()-30*DAY).toISOString().slice(0,10);curP=(a.find(x=>x[1].launch>=lim)||a[a.length-1])[0]}
 const psel=()=>`<div class="card"><label style="margin-top:0">Période</label><select onchange="curP=this.value;render(true)">${pl().map(x=>`<option value="${esc(x[0])}" ${curP===x[0]?"selected":""}>${esc(x[1].name)}</option>`).join("")}</select></div>`;
 let user,me=null,canDash=false,isOwner=false,ykOk=false,view="saisie",fStore="",fCol="",lastSig="",toast="",recent=[],busy=false,bulk={};
-let sel={store:""};
+let sel={store:""},per="mois";
+try{per=localStorage.getItem("periode")==="sem"?"sem":"mois"}catch(e){}
+// Vue « par semaine » : les ventes mensuelles sont ramenées à la semaine (7 jours sur 30,44)
+const WK=7/30.44,MO=28/30.44,cv=n=>per==="sem"?n*WK:n*MO,PU=()=>per==="sem"?"semaine":"mois (4 sem.)";
+const MIN_MOIS=250; // palier bas par défaut (ventes par mois dans le resto) ; réglable par resto dans Gestion. En dessous : simple reliquat
+const pal=st=>(S.stores[st]&&S.stores[st].min>0)?S.stores[st].min:MIN_MOIS;
+// Fenêtre glissante : les 4 dernières semaines complètes retenues. Chaque nouvelle semaine retenue remplace la plus ancienne.
+function wkStats(p,minMois){const MIN_SEM=(minMois||MIN_MOIS)/4,all=p.weeks.map((v,i)=>({i,start:p.first+i*7*DAY,total:v,ok:v>=MIN_SEM}));
+  const used=[];for(let i=all.length-1;i>=0&&used.length<4;i--)if(all[i].ok)used.push(all[i]);
+  const wk=used.length?used.reduce((a,b)=>a+b.total,0)/used.length:null,last4=p.weeks.slice(-4).reduce((a,b)=>a+b,0);
+  return{all,used,nb:used.length,avg:wk==null?null:wk*4,wk,last4}}
+function setPer(v){per=v;try{localStorage.setItem("periode",v)}catch(e){}render(true)}
 try{sel.store=localStorage.getItem("magasin")||""}catch(e){}
 const slug=s=>String(s).replace(/œ/g,"oe").replace(/Œ/g,"OE").replace(/æ/g,"ae").replace(/Æ/g,"AE").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const fd=t=>new Date(t).toLocaleDateString("fr-FR");
@@ -72,7 +83,11 @@ function latest(){const m={};for(const r of S.readings){const k=r.store+"__"+r.r
 // Moyenne mensuelle : base saisie par le manager, corrigée par les ventes réellement constatées (baisses de stock entre relevés, 90 derniers jours)
 // Produits reliés à Yokitup : ventes caisse (POS) à la place des baisses de stock ; les pertes sont suivies à part, hors calcul.
 function rate(l){const k=l.store+"__"+l.ref,b=l.monthly||0,p=S.pos[k];
-  if(p&&p.days>=TOL){const ob=p.sold/p.days*30,w=Math.min(1,p.days/60);return{m:b>0?w*ob+(1-w)*b:ob,obs:ob,pos:true}}
+  // Empanada reliée à Yokitup : moyenne par mois = moyenne des 4 dernières semaines complètes retenues (≥ 25 ventes) × 4.
+  // Mise à jour une fois par semaine (le lundi) : la semaine en cours n'est jamais comptée.
+  if(p){const st=wkStats(p,pal(l.store)),cur=st.last4/MO;
+    if(st.nb>0)return{m:st.avg/MO,obs:cur,pos:true,n1:st.nb,pal:pal(l.store)};
+    return{m:b>0?b:cur,obs:cur,pos:true}}
   const o=S.obs[k];if(!o||o.days<TOL)return{m:b,obs:null};const ob=o.sold/o.days*30,w=Math.min(1,o.days/60);return{m:b>0?w*ob+(1-w)*b:ob,obs:ob}}
 function calc(l,r,now,M){
   if(!r)return{c:"n",m:"Aucun relevé pour le moment."};
@@ -81,6 +96,8 @@ function calc(l,r,now,M){
   const o={est:Math.round(est),cov:M>0?est/M:null,out:M>0?st+q/M*30*DAY:null,cd:M>0?Math.round(est/M*30):null};
   const dn=new Date(now),me=new Date(dn.getFullYear(),dn.getMonth()+1,1).getTime(),dim=new Date(dn.getFullYear(),dn.getMonth()+1,0).getDate(),d0=new Date(dn.getFullYear(),dn.getMonth(),dn.getDate()).getTime(),sd=Math.round(Math.max(0,me-Math.max(d0,isNew?L0:d0))/DAY);
   o.mDays=sd;o.mNeed=Math.round(M*sd/dim);o.mGap=Math.round(est-M*sd/dim);
+  const we=d0+(dn.getDay()===0?1:8-dn.getDay())*DAY,wd=Math.round(Math.max(0,we-Math.max(d0,isNew?L0:d0))/DAY);
+  o.wDays=wd;o.wNeed=Math.round(M*wd/dim);o.wGap=Math.round(est-M*wd/dim);
   const empty=o.est<=0;
   if(isNew){
     const need=M*C.cover,gap=Math.ceil(need-est);
@@ -104,7 +121,7 @@ function calc(l,r,now,M){
 }
 
 function shell(body){
-  const tabs=[];if(canDash)tabs.push(["dash","Tableau de bord"]);if(canSaisie())tabs.push(["saisie","Saisie"]);if(isOwner)tabs.push(["gest","Gestion"]);
+  const tabs=[];if(canDash)tabs.push(["dash","Tableau de bord"]);if(canSaisie())tabs.push(["saisie","Saisie"]);if(isOwner)tabs.push(["ventes","Ventes moyennes"]);if(isOwner)tabs.push(["gest","Gestion"]);
   $("#app").innerHTML=`<header><h1>Suivi des stocks <span class="sub" style="font-weight:400">v4</span></h1><span><span class="role">${isOwner?"Admin":"Manager"}</span> <button class="role" style="border:0;font:inherit;font-size:12px" onclick="logout()">Quitter</button></span></header>`+
    (tabs.length>1?`<nav>${tabs.map(t=>`<button class="${view==t[0]?"on":""}" onclick="go('${t[0]}')">${t[1]}</button>`).join("")}</nav>`:"")+(isOwner&&view!=="saisie"&&pl().length>1?psel():"")+body+(toast?`<div class="toast">${esc(toast)}</div>`:"");
 }
@@ -159,16 +176,43 @@ function dash(){
   const cnt={r:0,a:0,o:0,g:0,n:0};base.forEach(x=>cnt[x.k.c]++);
   const list=base.filter(x=>!fCol||x.k.c===fCol).sort((a,b)=>ORD[a.k.c]-ORD[b.k.c]||nm(a.p).localeCompare(nm(b.p),"fr"));
   const syn={};
-  for(const x of base){const s=syn[x.l.ref]||(syn[x.l.ref]={p:x.p,g:x.l.group,M:0,q:0,e:0,mg:0,n:0,t:0,c:"n",rup:0});s.t++;
-    if(x.r){s.n++;s.q+=x.r.qty;s.e+=x.k.est;s.mg+=x.k.mGap;s.M+=x.M;if(x.k.c==="r")s.rup++;if(s.c==="n"||ORD[x.k.c]<ORD[s.c])s.c=x.k.c}}
+  for(const x of base){const s=syn[x.l.ref]||(syn[x.l.ref]={p:x.p,g:x.l.group,M:0,q:0,e:0,mg:0,wg:0,n:0,t:0,c:"n",rup:0});s.t++;
+    if(x.r){s.n++;s.q+=x.r.qty;s.e+=x.k.est;s.mg+=x.k.mGap;s.wg+=x.k.wGap;s.M+=x.M;if(x.k.c==="r")s.rup++;if(s.c==="n"||ORD[x.k.c]<ORD[s.c])s.c=x.k.c}}
   const sy=Object.values(syn).sort((a,b)=>ORD[a.c]-ORD[b.c]||nm(a.p).localeCompare(nm(b.p),"fr"));
   return `<div class="card"><label style="margin-top:0">Magasin</label><select onchange="fStore=this.value;render(true)"><option value="">Tous les magasins (cumul)</option>${stSorted().map(s=>`<option value="${esc(s[0])}" ${fStore===s[0]?"selected":""}>${esc(s[1].name)}</option>`).join("")}</select>
-  <div class="sub" style="margin-top:8px">Fin de gamme : ${fd(C.end)}<br>Stock estimé = dernier relevé − ventes moyennes écoulées depuis. Les ventes mensuelles s’ajustent d’après les baisses de stock constatées entre relevés.</div>
+  <div class="row">${[["mois","Par mois"],["sem","Par semaine"]].map(([v,t])=>`<button class="b2" style="flex:1${per===v?";background:var(--ac);border-color:var(--ac);color:#fff":""}" onclick="setPer('${v}')">${t}</button>`).join("")}</div>
+  <div class="sub" style="margin-top:8px">Fin de gamme : ${fd(C.end)}<br>Stock estimé = dernier relevé − ventes moyennes écoulées depuis. Ventes moyennes (Yokitup), par resto : moyenne des 4 dernières semaines complètes retenues ${isOwner?"(au-dessus du palier bas du resto, réglable dans Gestion)":""}, ramenée au mois (× 4). Chaque nouvelle semaine remplace la plus ancienne ; mise à jour chaque lundi.</div>
   <div class="chips">${["r","a","o","g","n"].map(c=>`<span class="chip ${c} ${fCol===c?"on":""}" onclick="fCol=fCol==='${c}'?'':'${c}';render(true)">${LBL[c]} · ${cnt[c]}</span>`).join("")}</div></div>`+
-  (sy.length?`<div class="card x"><b>Synthèse par produit</b><table><tr><th>Produit</th><th>Stock</th><th>Ventes/mois</th><th>Couv.</th><th>Fin du mois</th><th></th></tr>${sy.map(s=>`<tr><td>${esc(nm(s.p))}<div class="sub">${GL[s.g]} · ${s.n}/${s.t} relevés${s.rup?` · <b style="color:var(--r)">${s.rup} en rupture</b>`:""}</div></td><td>${s.n?s.q:"—"}<div class="sub">${s.n?fb(s.q):""}</div></td><td>${s.n?Math.round(s.M):"—"}</td><td>${s.n&&s.M>0?f1(s.e/s.M)+" m":"—"}</td><td style="color:var(--${s.mg>=0?"g":"r"})">${s.n?(s.mg>=0?"+":"")+s.mg:"—"}</td><td><span class="pill ${s.c}">${SH[s.c]}</span></td></tr>`).join("")}</table></div>`:"")+
+  (sy.length?`<div class="card x"><b>Synthèse par produit</b><table><tr><th>Produit</th><th>Stock</th><th>Ventes/${per==="sem"?"sem.":"mois"}</th><th>Couv.</th><th>Fin ${per==="sem"?"de sem.":"du mois"}</th><th></th></tr>${sy.map(s=>`<tr><td>${esc(nm(s.p))}<div class="sub">${GL[s.g]} · ${s.n}/${s.t} relevés${s.rup?` · <b style="color:var(--r)">${s.rup} en rupture</b>`:""}</div></td><td>${s.n?s.q:"—"}<div class="sub">${s.n?fb(s.q):""}</div></td>${(g=>`<td>${s.n?Math.round(cv(s.M)):"—"}</td><td>${s.n&&s.M>0?(per==="sem"?f1(s.e/s.M/WK)+" sem":f1(s.e/s.M)+" m"):"—"}</td><td style="color:var(--${g>=0?"g":"r"})">${s.n?(g>=0?"+":"")+g:"—"}</td>`)(per==="sem"?s.wg:s.mg)}<td><span class="pill ${s.c}">${SH[s.c]}</span></td></tr>`).join("")}</table></div>`:"")+
   (list.length?list.map(x=>{const k=x.k,R=x.R;return `<div class="card it ${k.c}"><div class="top"><div><b>${esc(nm(x.p))}</b><div class="sub">${GL[x.l.group]} · ${esc(x.st.name)}</div></div><span class="pill ${k.c}">${LBL[k.c]}</span></div>
-  <div class="grid"><div><b>Stock (dernier relevé)</b>${x.r?x.r.qty+` <span class="sub">${fb(x.r.qty)}</span>`+(k.est!==x.r.qty?`<div class="sub">≈ ${k.est} auj. (${fb(k.est)})</div>`:""):"—"}</div><div><b>Ventes moyennes/mois</b>${Math.round(x.M)}${R.obs!=null?` <span class="sub">(saisi ${Math.round(x.l.monthly||0)}, ${R.pos?"caisse":"constaté"} ${Math.round(R.obs)})</span>`:""}</div><div><b>Couverture estimée</b>${k.cov!=null?f1(k.cov)+" mois":"—"}</div><div><b>Épuisement prévu</b>${k.out&&x.r&&x.r.qty>0?fd(k.out):"—"}</div></div>
-  <div class="msg">${esc(k.m)}</div>${x.r&&k.mDays!=null?`<div class="msg"><b>Fin du mois</b> : ${k.mDays>0?`${k.mDays} j à couvrir (≈ ${k.mNeed} unités) pour un stock estimé de ≈ ${k.est}. <span class="pill ${k.mGap>=0?"g":"r"}">${k.mGap>=0?"Suffisant (+"+k.mGap+")":"Insuffisant ("+k.mGap+")"}</span>`:"aucune vente prévue d’ici là."}${k.cd!=null&&k.est>0?` Le stock couvre encore ≈ ${k.cd} j.`:""}</div>`:""}${x.r?`<div class="sub" style="margin-top:6px">Relevé du ${fdt(x.r.ts)} — ${esc(x.r.by==="import"?"import":x.r.by==="yokitup"?"Yokitup":(S.names[x.r.by]||"collaborateur"))}</div>`:""}</div>`}).join(""):`<div class="card">Aucun élément à afficher.</div>`);
+  <div class="grid"><div><b>Stock (dernier relevé)</b>${x.r?x.r.qty+` <span class="sub">${fb(x.r.qty)}</span>`+(k.est!==x.r.qty?`<div class="sub">≈ ${k.est} auj. (${fb(k.est)})</div>`:""):"—"}</div><div><b>Ventes moyennes/${PU()}</b>${Math.round(cv(x.M))}${R.n1?` <span class="sub">(moyenne des ${R.n1} dernière${R.n1>1?"s":""} semaine${R.n1>1?"s":""} retenue${R.n1>1?"s":""}${isOwner?`, ≥ ${Math.ceil(R.pal/4)} ventes/sem.`:""})</span>${isOwner?`<div class="sub">Détail : onglet « Ventes moyennes »</div>`:""}`:R.obs!=null?` <span class="sub">(saisi ${Math.round(cv(x.l.monthly||0))}, ${R.pos?"caisse":"constaté"} ${Math.round(cv(R.obs))})</span>`:""}</div><div><b>Couverture estimée</b>${k.cov!=null?(per==="sem"?f1(k.cov/WK)+" sem.":f1(k.cov)+" mois"):"—"}</div><div><b>Épuisement prévu</b>${k.out&&x.r&&x.r.qty>0?fd(k.out):"—"}</div></div>
+  <div class="msg">${esc(k.m)}</div>${x.r&&k.mDays!=null?(([D,N,G])=>`<div class="msg"><b>${per==="sem"?"Fin de semaine (dimanche)":"Fin du mois"}</b> : ${D>0?`${D} j à couvrir (≈ ${N} unités, ${fb(N)}) pour un stock estimé de ≈ ${k.est} (${fb(k.est)}). <span class="pill ${G>=0?"g":"r"}">${G>=0?"Suffisant (+"+G+" · +"+fb(G).replace("≈ ","")+")":"Insuffisant ("+G+" · −"+fb(-G).replace("≈ ","")+")"}</span>`:"aucune vente prévue d’ici là."}${k.cd!=null&&k.est>0?` Le stock couvre encore ≈ ${k.cd} j.`:""}</div>`)(per==="sem"?[k.wDays,k.wNeed,k.wGap]:[k.mDays,k.mNeed,k.mGap]):""}${x.r?`<div class="sub" style="margin-top:6px">Relevé du ${fdt(x.r.ts)} — ${esc(x.r.by==="import"?"import":x.r.by==="yokitup"?"Yokitup":(S.names[x.r.by]||"collaborateur"))}</div>`:""}</div>`}).join(""):`<div class="card">Aucun élément à afficher.</div>`);
+}
+
+/* ---------- VENTES MOYENNES (admins uniquement) : suivi des calculs et des relevés ---------- */
+let vStore="";const REL={};
+async function loadRel(st){try{const {data}=await sb.from("stk_readings").select("product_id,qty,created_at,source,user_id").eq("store_id",st).order("created_at",{ascending:false}).limit(300);REL[st]=data||[]}catch(e){REL[st]=[]}render(true)}
+const fdd=t=>new Date(t).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"});
+function ventes(){
+  const stl=stSorted().filter(([id])=>Object.keys(S.pos).some(k=>k.startsWith(id+"__")));
+  if(!stl.length)return `<div class="card">Aucune empanada reliée à Yokitup pour l’instant.</div>`;
+  const vs=stl.some(s=>s[0]===vStore)?vStore:stl[0][0];
+  if(!(vs in REL)){REL[vs]=null;loadRel(vs)}
+  const items=Object.entries(S.pos).filter(([k])=>k.startsWith(vs+"__")).map(([k,p])=>({pid:k.split("__")[1],p,st:wkStats(p,pal(vs))})).filter(x=>S.products[x.pid]).sort((a,b)=>nm(S.products[a.pid]).localeCompare(nm(S.products[b.pid]),"fr"));
+  const rel=REL[vs];
+  const prods=[...new Set(Object.keys(S.pos).map(k=>k.split("__")[1]))].filter(id=>S.products[id]).sort((a,b)=>nm(S.products[a]).localeCompare(nm(S.products[b]),"fr"));
+  const cell=(st,pid)=>{const p=S.pos[st+"__"+pid];if(!p)return `<td>—</td>`;const s=wkStats(p,pal(st));
+    return s.avg!=null?`<td><b>${Math.round(s.avg)}</b><div class="sub">${Math.round(s.wk)}/sem · ${fb(s.avg).replace("≈ ","")}</div></td>`:`<td><span class="sub">prévision</span></td>`};
+  const comp=`<div class="card x"><b>Comparatif des restos</b><div class="sub">Ventes moyennes par mois (4 sem.), puis par semaine et en bacs. « prévision » : aucune semaine au-dessus du palier, la prévision saisie est utilisée.</div>
+  <table><tr><th>Empanada</th>${stl.map(([id,s])=>`<th>${esc(s.name)}<div class="sub">palier ${pal(id)}</div></th>`).join("")}</tr>
+  ${prods.map(pid=>`<tr><td>${esc(nm(S.products[pid]))}</td>${stl.map(([id])=>cell(id,pid)).join("")}</tr>`).join("")}</table></div>`;
+  return comp+`<div class="card"><label style="margin-top:0">Détail d’un magasin</label><select onchange="vStore=this.value;render(true)">${stl.map(([id,s])=>`<option value="${esc(id)}" ${vs===id?"selected":""}>${esc(s.name)}</option>`).join("")}</select>
+  <div class="sub" style="margin-top:8px">Ventes caisse Yokitup par semaine complète (lundi → dimanche). Une semaine est <b>retenue</b> si elle a au moins ${Math.ceil(pal(vs)/4)} ventes dans ce resto (palier bas de ${esc(S.stores[vs].name)} : ${pal(vs)} par mois, réglable dans Gestion), sinon elle est <b>écartée</b> (simple reliquat). Ventes moyennes par mois = moyenne des <b>4 dernières semaines retenues</b> × 4 : chaque nouvelle semaine retenue remplace la plus ancienne. Mise à jour chaque lundi.</div></div>`+
+  items.map(({pid,p,st})=>{const r=(rel||[]).filter(x=>x.product_id===pid).slice(0,6);
+    return `<div class="card"><div class="top"><b>${esc(nm(S.products[pid]))}</b><span class="pill ${st.nb?"g":"n"}">${st.nb?st.nb+" semaine"+(st.nb>1?"s":"")+" retenue"+(st.nb>1?"s":""):"aucune semaine retenue"}</span></div>
+    <div class="grid"><div><b>Ventes moyennes / mois (4 sem.)</b>${st.avg!=null?Math.round(st.avg)+` <span class="sub">${fb(st.avg)}</span>`:"— <span class=\"sub\">(prévision saisie utilisée)</span>"}</div><div><b>Par semaine</b>${st.wk!=null?Math.round(st.wk)+` <span class="sub">${fb(st.wk)}</span>`:"—"}</div></div>
+    <div class="sub" style="margin-top:10px"><b>12 dernières semaines</b></div><div class="x"><table><tr><th>Semaine</th><th>Ventes</th><th></th></tr>${st.all.slice(-12).reverse().map(w=>`<tr><td>${fdd(w.start)} → ${fdd(w.start+6*DAY)}</td><td>${Math.round(w.total)}</td><td><span class="pill ${st.used.includes(w)?"g":w.ok?"o":"n"}">${st.used.includes(w)?"dans la moyenne":w.ok?"retenue (plus ancienne)":"écartée"}</span></td></tr>`).join("")}</table></div>
+    <div class="sub" style="margin-top:10px"><b>Derniers relevés de stock</b></div>${rel==null?`<div class="sub">Chargement…</div>`:r.length?`<div class="x"><table><tr><th>Date</th><th>Stock</th><th>Source</th></tr>${r.map(x=>`<tr><td>${fdt(x.created_at)}</td><td>${x.qty} <span class="sub">${fb(x.qty)}</span></td><td>${x.source==="yokitup"?"Yokitup":x.source==="import"?"import":esc(S.names[x.user_id]||"collaborateur")}</td></tr>`).join("")}</table></div>`:`<div class="sub">Aucun relevé.</div>`}</div>`}).join("");
 }
 
 /* ---------- GESTION (manager uniquement) ---------- */
@@ -185,6 +229,8 @@ function gest(){
   <label>Fin de gamme</label><input type="date" value="${esc(np.end)}" onchange="np.end=this.value"><label>Lancement des nouveaux produits</label><input type="date" value="${esc(np.launch)}" onchange="np.launch=this.value">
   ${has?`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" ${np.copy?"checked":""} onchange="np.copy=this.checked"> Copier les produits et ventes de la période actuelle</label>`:""}
   <button class="btn" onclick="newP()" ${busy?"disabled":""}>Créer la période</button></div>
+  <div class="card"><b>Palier bas des ventes moyennes</b><div class="sub">Ventes par mois en dessous desquelles une semaine est considérée comme un simple reliquat et écartée de la moyenne (seuil hebdomadaire = palier ÷ 4). Par défaut : ${MIN_MOIS}.</div>
+  ${stl.map(([id,s])=>`<div class="row"><span style="flex:1">${esc(s.name)}</span><input type="number" min="0" step="10" value="${esc(s.min||MIN_MOIS)}" style="max-width:110px" onchange="setPal('${id}',this.value)"><span class="sub">/mois</span></div>`).join("")}</div>
   <div class="card"><b>Magasins</b>${stl.map(([id,s])=>`<div class="row"><input value="${esc(s.name)}" onchange="renStore('${id}',this.value)"><button class="b2 d" onclick="delStore('${id}')">Supprimer</button></div>`).join("")}
   <div class="row"><input placeholder="Nouveau magasin" value="${esc(nStore)}" oninput="nStore=this.value"><button class="b2" onclick="addStore()">Ajouter</button></div></div>
   ${has&&stl.length?`<div class="card"><b>Produits de la période</b><label>Magasin</label><select onchange="gStore=this.value;render(true)">${stl.map(([id,s])=>`<option value="${esc(id)}" ${gs===id?"selected":""}>${esc(s.name)}</option>`).join("")}</select>
@@ -212,6 +258,7 @@ async function newP(){
 }
 function delPeriod(){if(!confirm("Supprimer la période « "+P().name+" » et ses lignes ? Les produits et relevés restent."))return;run(async()=>{await sb.from("stk_lines").delete().eq("period_id",curP).throwOnError();await sb.from("stk_periods").delete().eq("id",curP).throwOnError();curP=""},"Période supprimée ✓")}
 async function addStore(){const n=nStore.trim();if(!n)return;nStore="";run(()=>sb.from("stk_stores").insert({name:n}).throwOnError(),"Magasin ajouté ✓")}
+function setPal(id,v){const n=num(v);if(!(n>0)){flash("Palier invalide : nombre > 0.");return}run(()=>sb.from("stk_stores").update({min_month:n}).eq("id",id).throwOnError(),"Palier enregistré ✓")}
 const renStore=(id,n)=>n.trim()&&run(()=>sb.from("stk_stores").update({name:n.trim()}).eq("id",id).throwOnError(),"Renommé ✓");
 function delStore(id){if(!confirm("Supprimer le magasin « "+S.stores[id].name+" » avec ses lignes et ses relevés ?"))return;run(async()=>{for(const t of["stk_readings","stk_lines"])await sb.from(t).delete().eq("store_id",id).throwOnError();await sb.from("stk_stores").delete().eq("id",id).throwOnError()},"Magasin supprimé ✓")}
 async function addProd(){
@@ -250,24 +297,25 @@ async function addMember(){const e=memEmail.trim();if(!e)return;const {error}=aw
 /* ---------- Noyau ---------- */
 function render(force){
   if(!sess){loginView();return}
-  if(view==="gest"&&!isOwner)view="dash";if(view==="saisie"&&!canSaisie())view="dash";
+  if((view==="gest"||view==="ventes")&&!isOwner)view="dash";if(view==="saisie"&&!canSaisie())view="dash";
   const sig=view==="saisie"?"s"+JSON.stringify([S.stores,S.lines,S.products,curP,S.readings.length]):Math.random();
   if(!force&&view==="saisie"&&sig===lastSig)return;
   lastSig=sig;
-  shell(view==="dash"?dash():view==="gest"?gest():saisie());
+  shell(view==="dash"?dash():view==="gest"?gest():view==="ventes"?ventes():saisie());
 }
 let sb,sess=null,started="",loginErr="",tm,memEmail="",memMsg="";
 async function loadAll(){
+  for(const k in REL)delete REL[k]; // relevés de l’onglet Ventes moyennes rechargés après chaque mise à jour
   const q=t=>sb.from(t).select("*");
   const [st,pr,ln,pe]=await Promise.all([q("stk_stores"),q("stk_products"),q("stk_lines"),q("stk_periods")]);
   const bad=[st,pr,ln,pe].find(x=>x.error);
   if(bad){$("#app").innerHTML=`<div class="card err">Accès aux données impossible : ${esc(bad.error.message)}</div>`;return}
-  S.stores=Object.fromEntries(st.data.map(r=>[r.id,{name:r.name}]));
+  S.stores=Object.fromEntries(st.data.map(r=>[r.id,{name:r.name,min:Number(r.min_month)||0}]));
   S.products=Object.fromEntries(pr.data.map(r=>[r.id,{name:r.name,key:r.key}]));
   S.lines=Object.fromEntries(ln.data.map(r=>[r.id,{period:r.period_id,store:r.store_id,ref:r.product_id,group:r.grp,monthly:Number(r.monthly)}]));
   S.periods=Object.fromEntries(pe.data.map(r=>[r.id,{name:r.name,end:r.end_date,launch:r.launch_date,cover:Number(r.cover)}]));
-  const [rd,ob,po,ys]=await Promise.all([q("stk_latest_readings"),q("stk_obs"),q("stk_pos_rate"),sb.from("stk_yk_state").select("last_sync,last_error").eq("id",1).maybeSingle()]);
-  S.pos=Object.fromEntries((po.data||[]).map(r=>[r.store_id+"__"+r.product_id,{sold:Number(r.sold),days:Number(r.days)}]));
+  const [rd,ob,po,ys]=await Promise.all([q("stk_latest_readings"),q("stk_obs"),q("stk_weekly"),sb.from("stk_yk_state").select("last_sync,last_error").eq("id",1).maybeSingle()]);
+  S.pos=Object.fromEntries((po.data||[]).map(r=>[r.store_id+"__"+r.product_id,{weeks:(r.weeks||[]).map(Number),first:Date.parse(r.first_week+"T00:00:00")}]));
   // Stock Yokitup inchangé depuis le dernier relevé : il reste valable jusqu'à la dernière synchro
   const ls=ys.data&&ys.data.last_sync?Date.parse(ys.data.last_sync):0;
   ykOk=!!ls&&!ys.data.last_error&&Date.now()-ls<YK_OK_H*36e5;
