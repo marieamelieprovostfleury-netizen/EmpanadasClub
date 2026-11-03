@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<title>Suivi des stocks</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e4e7ec;--ac:#2563eb;--g:#16a34a;--r:#dc2626;--o:#ea580c;--n:#98a2b3;--gb:#dcfce7;--rb:#fee2e2;--ob:#ffedd5;--nb:#eef0f3;--a:#d97706;--ab:#fef3c7;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--card:#181b21;--tx:#eef0f3;--mu:#98a2b3;--bd:#2a2f38;--ac:#60a5fa;--g:#4ade80;--r:#f87171;--o:#fb923c;--n:#98a2b3;--gb:#12301e;--rb:#3b1517;--ob:#3a2210;--nb:#23272e;--a:#fbbf24;--ab:#3a2e0e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1115;--card:#181b21;--tx:#eef0f3;--mu:#98a2b3;--bd:#2a2f38;--ac:#60a5fa;--g:#4ade80;--r:#f87171;--o:#fb923c;--n:#98a2b3;--gb:#12301e;--rb:#3b1517;--ob:#3a2210;--nb:#23272e;--a:#fbbf24;--ab:#3a2e0e;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.w{max-width:760px;margin:0 auto;padding:14px}
+h1{font-size:19px;margin:0}header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.role{font-size:12px;background:var(--nb);color:var(--mu);padding:3px 10px;border-radius:99px}
+nav{display:flex;gap:6px;margin-bottom:14px}nav button{flex:1;padding:10px 6px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font:inherit;font-size:14px}
+nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:10px}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
+select,input,textarea{width:100%;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit}
+input.q{font-size:28px;text-align:center;font-weight:600}
+textarea{min-height:150px;font:13px ui-monospace,Menlo,monospace}
+.btn{width:100%;margin-top:14px;padding:14px;border:0;border-radius:12px;background:var(--ac);color:#fff;font:inherit;font-weight:600}
+.btn:disabled{opacity:.5}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.chip{padding:6px 12px;border-radius:99px;border:2px solid transparent;font-size:13px;font-weight:600;cursor:pointer}
+.chip.on{border-color:var(--tx)}
+.g{background:var(--gb);color:var(--g)}.r{background:var(--rb);color:var(--r)}.o{background:var(--ob);color:var(--o)}.n{background:var(--nb);color:var(--n)}
+.it{border-left:6px solid var(--n)}.it.g{border-color:var(--g)}.it.r{border-color:var(--r)}.it.o{border-color:var(--o)}
+.it{background:var(--card);color:var(--tx)}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:start}
+.pill{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.sub{font-size:13px;color:var(--mu)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;font-size:14px}
+.grid b{display:block;font-size:12px;color:var(--mu);font-weight:400}
+.msg{margin-top:8px;font-size:14px}
+.toast{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--g);color:#fff;padding:12px;border-radius:12px;text-align:center;font-weight:600}
+.err{color:var(--r)}
+.x{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}td,th{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:right;vertical-align:top}td:first-child,th:first-child{text-align:left}th{font-size:12px;color:var(--mu);font-weight:400}
+.a{background:var(--ab);color:var(--a)}.it.a{border-color:var(--a)}.period-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px}.period-tools label{margin-top:0}.readonly{opacity:.92}.row{display:flex;gap:6px;align-items:center;margin-top:8px}.row input,.row select{padding:9px;font-size:14px}.b2{padding:9px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);font:inherit;font-size:13px;white-space:nowrap}.b2.d{color:var(--r)}
+</style></head><body><div class="w" id="app"><div class="card">Chargement…</div></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const GL={old:"",new:""};
+const LBL={r:"Rupture",a:"Rupture prévue",o:"Surstock",g:"OK",n:"Stock non relevé"};
+const SH={r:"Rupture",a:"Prévue",o:"Surstock",g:"OK",n:"N/R"};
+const ORD={r:0,a:1,o:2,n:3,g:4};
+const DAY=864e5,TOL=7,BAC=70,ALERT_D=10,RESP_DASH=true; // RESP_DASH=true : les responsables voient aussi le tableau de bord
+const S={stores:{},products:{},lines:{},readings:[],history:[],names:{},periods:{},obs:{},members:[],requests:[]};
+let curP="",np={name:"",copy:true},nProd={name:"",m:"",store:""},nStore="",gStore="";
+const pl=()=>Object.entries(S.periods).sort((a,b)=>a[1].launch<b[1].launch?-1:1);
+const P=()=>Object.assign({name:"",end:"2026-11-30",launch:"2026-12-01",cover:1},S.periods[curP]||{});
+function autoP(){const a=pl();if(!a.length){curP="";return}if(S.periods[curP])return;const lim=new Date(Date.now()-30*DAY).toISOString().slice(0,10);curP=(a.find(x=>x[1].launch>=lim)||a[a.length-1])[0]}
+const psel=()=>`<div class="card"><label style="margin-top:0">Période</label><select onchange="curP=this.value;render(true)">${pl().map(x=>`<option value="${esc(x[0])}" ${curP===x[0]?"selected":""}>${esc(x[1].name)}</option>`).join("")}</select></div>`;
+let user,me=null,canDash=false,isOwner=false,view="saisie",fStore="",fCol="",lastSig="",toast="",recent=[],busy=false,bulk={},dashMode="month",dashDate=new Date().toISOString().slice(0,10);
+let sel={store:""};
+try{sel.store=localStorage.getItem("magasin")||""}catch(e){}
+const slug=s=>String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const fd=t=>new Date(t).toLocaleDateString("fr-FR");
+const fdt=t=>new Date(t).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"});
+const f1=n=>n.toFixed(1).replace(".",",");
+const nm=p=>p?p.name:"?";
+const fb=n=>{n=Math.max(0,Math.round(n));return "≈ "+f1(n/BAC)+(n>=2*BAC?" bacs":" bac")};
+const num=s=>parseFloat(String(s).replace(/\s/g,"").replace(",","."));
+const stSorted=()=>Object.entries(S.stores).sort((a,b)=>a[1].name.localeCompare(b[1].name,"fr"));
+
+function latest(){const m={};for(const r of S.readings){const k=r.store+"__"+r.ref;if(!m[k]||r.ts>m[k].ts)m[k]=r}return m}
+// Moyenne mensuelle : base saisie par le manager, corrigée par les ventes réellement constatées (baisses de stock entre relevés, 90 derniers jours)
+function rate(l){const o=S.obs[l.store+"__"+l.ref],b=l.monthly||0;if(!o||o.days<TOL)return{m:b,obs:null};const ob=o.sold/o.days*30,w=Math.min(1,o.days/60);return{m:b>0?w*ob+(1-w)*b:ob,obs:ob}}
+function calc(l,r,now,M){
+  if(!r)return{c:"n",m:"Aucun relevé pour le moment."};
+  const q=r.qty,t0=r.ts||now;
+  const elapsed=Math.max(0,now-t0)/(30*DAY);
+  const est=M>0?Math.max(0,q-M*elapsed):q;
+  const dn=new Date(now),monthEnd=new Date(dn.getFullYear(),dn.getMonth()+1,1).getTime();
+  const days=Math.max(0,(monthEnd-now)/DAY);
+  const need=M*days/30;
+  // Valeur signée : positive = surplus prévu, négative = quantité manquante.
+  const gap=est-need;
+  const o={
+    est:Math.round(est),
+    cov:M>0?est/M:null,
+    out:M>0?t0+q/M*30*DAY:null,
+    cd:M>0?Math.round(est/M*30):null,
+    mDays:Math.round(days),
+    mNeed:Math.round(need),
+    mGap:Math.round(gap)
+  };
+  if(o.est<=0){
+    o.c="r";o.m="Rupture : stock estimé à zéro.";
+  }else if(M<=0){
+    o.c="a";o.m="Ventes moyennes non renseignées : impossible de confirmer que le stock tiendra jusqu’à la fin du mois.";
+  }else if(gap<0){
+    o.c="a";o.m=`Stock insuffisant : il manque environ ${Math.abs(o.mGap)} unités (${fb(Math.abs(o.mGap))}) pour couvrir les ventes prévues jusqu’à la fin du mois.`;
+  }else{
+    o.c="g";o.m="OK : le stock devrait couvrir les ventes prévues jusqu’à la fin du mois.";
+  }
+  return o;
+}
+
+function shell(body){
+  const tabs=[];if(canDash)tabs.push(["dash","Tableau de bord"]);tabs.push(["saisie","Saisie"]);if(isOwner)tabs.push(["gest","Gestion"]);
+  $("#app").innerHTML=`<header><h1>Suivi des stocks</h1><span><span class="role">${isOwner?"Manager":"Responsable"}</span> <button class="role" style="border:0;font:inherit;font-size:12px" onclick="logout()">Quitter</button></span></header>`+
+   (tabs.length>1?`<nav>${tabs.map(t=>`<button class="${view==t[0]?"on":""}" onclick="go('${t[0]}')">${t[1]}</button>`).join("")}</nav>`:"")+((view==="dash"||view==="gest"||view==="saisie")&&pl().length>1?psel():"")+body+(toast?`<div class="toast">${esc(toast)}</div>`:"");
+}
+function go(v){view=v;render(true)}
+
+/* ---------- SAISIE (mise à jour groupée) ---------- */
+function saisie(){
+  const st=stSorted(),L=latest();
+  const ps=Object.values(S.lines).filter(l=>l.store===sel.store&&l.period===curP&&S.products[l.ref]);
+  if(!st.length)return `<div class="card">Aucun magasin pour l’instant.${isOwner?" Créez-en un dans l’onglet « Gestion ».":" Demandez au manager de configurer l’application."}</div>`;
+  const b=bulk[sel.store]||{};
+  const grp=g=>{const a=ps.filter(l=>l.group===g).sort((x,y)=>nm(S.products[x.ref]).localeCompare(nm(S.products[y.ref]),"fr"));
+    return a.length?`<div class="sub" style="margin-top:14px"><b>${GL[g]}</b></div>`+a.map(l=>{const r=L[l.store+"__"+l.ref],v=b[l.ref]??"";
+    return `<div class="row"><div style="flex:1;min-width:0">${esc(nm(S.products[l.ref]))}<div class="sub">${r?`dernier : ${r.qty} · ${fb(r.qty)}`:"aucun relevé"}</div></div><div style="width:110px"><input type="number" inputmode="numeric" min="0" step="1" placeholder="${r?r.qty:"—"}" value="${esc(v)}" style="text-align:center;font-weight:600" oninput="bq('${l.ref}',this.value,this)"><div class="sub bq" style="text-align:center">${v!==""&&!isNaN(+v)?fb(+v):""}</div></div></div>`}).join(""):""};
+  return `<div class="card"><label style="margin-top:0">Magasin</label>
+  <select onchange="sel.store=this.value;try{localStorage.setItem('magasin',this.value)}catch(e){}render(true)"><option value="">Choisir…</option>${st.map(s=>`<option value="${esc(s[0])}" ${sel.store===s[0]?"selected":""}>${esc(s[1].name)}</option>`).join("")}</select>
+  ${sel.store?(ps.length?`<div class="sub" style="margin-top:10px">Renseignez uniquement les produits comptés : un champ <b>vide</b> laisse le stock <b>inchangé</b>. (1 bac = ${BAC} unités)</div>${grp("old")}${grp("new")}<button class="btn" onclick="save()" ${busy?"disabled":""}>Enregistrer les stocks saisis</button>`:`<div class="sub" style="margin-top:10px">Aucun produit pour ce magasin sur cette période.</div>`):""}</div>`+
+  (recent.length?`<div class="card"><div class="sub">Derniers enregistrements</div>${recent.map(r=>`<div style="margin-top:6px">${esc(r)}</div>`).join("")}</div>`:"");
+}
+function bq(ref,v,el){(bulk[sel.store]=bulk[sel.store]||{})[ref]=v;const t=el.parentNode.querySelector(".bq");if(t)t.textContent=v!==""&&!isNaN(+v)?fb(+v):""}
+async function save(){
+  if(!sel.store){flash("Choisissez un magasin.");return}
+  const rows=[];let bad=0;
+  for(const [ref,v] of Object.entries(bulk[sel.store]||{})){
+    if(String(v).trim()==="")continue;
+    const q=Number(String(v).trim().replace(",","."));
+    if(!Number.isInteger(q)||q<0){bad++;continue}
+    rows.push({store_id:sel.store,product_id:ref,qty:q});
+  }
+  if(bad){flash(bad+" valeur(s) invalide(s) : entiers ≥ 0 uniquement.");return}
+  if(!rows.length){flash("Aucune valeur saisie : rien n’a été modifié.");return}
+  busy=true;
+  try{
+    await sb.from("stk_readings").insert(rows).throwOnError();
+    recent.unshift(`${fdt(Date.now())} · ${S.stores[sel.store].name} : ${rows.length} produit(s) mis à jour`);recent=recent.slice(0,5);
+    bulk[sel.store]={};busy=false;flash(`${rows.length} stock(s) enregistré(s) ✓ — les autres sont inchangés`);
+  }catch(e){busy=false;flash("Échec de l’enregistrement. Vérifiez la connexion et réessayez.")}
+}
+function flash(t){toast=t;render(true);setTimeout(()=>{toast="";render(true)},2800)}
+
+/* ---------- SUIVI HISTORIQUE HEBDOMADAIRE / MENSUEL ---------- */
+function dateISO(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`}
+function selectedRange(){
+  const d=new Date((dashDate||dateISO(new Date()))+"T12:00:00");
+  if(dashMode==="week"){
+    const start=new Date(d);start.setDate(d.getDate()-((d.getDay()+6)%7));start.setHours(0,0,0,0);
+    const end=new Date(start);end.setDate(start.getDate()+7);
+    return {start:start.getTime(),end:end.getTime(),label:`Semaine du ${fd(start)} au ${fd(end.getTime()-1)}`};
+  }
+  const start=new Date(d.getFullYear(),d.getMonth(),1),end=new Date(d.getFullYear(),d.getMonth()+1,1);
+  return {start:start.getTime(),end:end.getTime(),label:start.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})};
+}
+function historicalPanel(){
+  const rg=selectedRange(), all=S.history.filter(r=>r.ts>=rg.start&&r.ts<rg.end&&(!fStore||r.store===fStore));
+  const by={};
+  for(const r of all){const k=r.store+"__"+r.ref;if(!by[k])by[k]={store:r.store,ref:r.ref,first:r,last:r,count:0};const x=by[k];if(r.ts<x.first.ts)x.first=r;if(r.ts>x.last.ts)x.last=r;x.count++}
+  const rows=Object.values(by).sort((a,b)=>nm(S.products[a.ref]).localeCompare(nm(S.products[b.ref]),"fr"));
+  const count=all.length;
+  return `<div class="card"><b>Suivi ${dashMode==="week"?"hebdomadaire":"mensuel"}</b><div class="sub" style="margin-top:4px">${esc(rg.label)} · ${count} relevé(s) enregistré(s)</div>
+  <div class="chips"><button class="b2 ${dashMode==="week"?"on":""}" onclick="dashMode='week';render(true)">Vue semaine</button><button class="b2 ${dashMode==="month"?"on":""}" onclick="dashMode='month';render(true)">Vue mois</button></div>
+  <div class="period-tools"><div><label>Choisir une date</label><input type="date" value="${esc(dashDate)}" onchange="dashDate=this.value;render(true)"></div><div><label>Historique</label><button class="b2" style="width:100%;padding:12px" onclick="dashDate=dateISO(new Date());render(true)">Période actuelle</button></div></div>
+  </div>`;
+}
+
+/* ---------- TABLEAU DE BORD ---------- */
+function dash(){
+  const now=Date.now(),L=latest(),rows=[],C=P();
+  for(const l of Object.values(S.lines)){
+    if(l.period!==curP)continue;const p=S.products[l.ref];if(!p)continue;const r=L[l.store+"__"+l.ref],R=rate(l);
+    rows.push({l,p,r,R,M:R.m,st:S.stores[l.store]||{name:l.store},k:calc(l,r,now,R.m)});
+  }
+  const base=rows.filter(x=>!fStore||x.l.store===fStore);
+  const cnt={r:0,a:0,o:0,g:0,n:0};base.forEach(x=>cnt[x.k.c]++);
+  const list=base.filter(x=>!fCol||x.k.c===fCol).sort((a,b)=>ORD[a.k.c]-ORD[b.k.c]||nm(a.p).localeCompare(nm(b.p),"fr"));
+  const syn={};
+  for(const x of base){const s=syn[x.l.ref]||(syn[x.l.ref]={p:x.p,g:x.l.group,M:0,q:0,e:0,mg:0,n:0,t:0,c:"n",rup:0});s.t++;
+    if(x.r){s.n++;s.q+=x.r.qty;s.e+=x.k.est;s.mg+=x.k.mGap;s.M+=x.M;if(x.k.c==="r")s.rup++;if(s.c==="n"||ORD[x.k.c]<ORD[s.c])s.c=x.k.c}}
+  const sy=Object.values(syn).sort((a,b)=>ORD[a.c]-ORD[b.c]||nm(a.p).localeCompare(nm(b.p),"fr"));
+  return `<div class="card"><label style="margin-top:0">Magasin</label><select onchange="fStore=this.value;render(true)"><option value="">Tous les magasins (cumul)</option>${stSorted().map(s=>`<option value="${esc(s[0])}" ${fStore===s[0]?"selected":""}>${esc(s[1].name)}</option>`).join("")}</select>
+  <div class="sub" style="margin-top:8px">Stock estimé = dernier relevé − ventes moyennes écoulées depuis. Les ventes mensuelles s’ajustent d’après les baisses de stock constatées entre relevés.</div>
+  <div class="chips">${["r","a","o","g","n"].map(c=>`<span class="chip ${c} ${fCol===c?"on":""}" onclick="fCol=fCol==='${c}'?'':'${c}';render(true)">${LBL[c]} · ${cnt[c]}</span>`).join("")}</div></div>`+historicalPanel()+
+  (sy.length?`<div class="card x"><b>Synthèse par produit</b><table><tr><th>Produit</th><th>Stock</th><th>Ventes/mois</th><th>Couv.</th><th>Fin du mois</th><th></th></tr>${sy.map(s=>`<tr><td>${esc(nm(s.p))}<div class="sub">${s.n}/${s.t} relevés${s.rup&&!fStore?` · <b style="color:var(--r)">${s.rup} en rupture</b>`:""}</div></td><td>${s.n?s.q:"—"}<div class="sub">${s.n?fb(s.q):""}</div></td><td>${s.n?Math.round(s.M):"—"}</td><td>${s.n&&s.M>0?f1(s.e/s.M)+" m":"—"}</td><td style="color:var(--${s.mg>=0?"g":"r"})">${s.n?(s.mg>0?"+":"")+s.mg:"—"}<div class="sub">${s.n?(s.mg<0?"Manque : "+fb(-s.mg):"Surplus : "+fb(s.mg)):""}</div></td><td><span class="pill ${s.c}">${SH[s.c]}</span></td></tr>`).join("")}</table></div>`:"")+
+  (list.length?list.map(x=>{const k=x.k,R=x.R;return `<div class="card it ${k.c}"><div class="top"><div><b>${esc(nm(x.p))}</b><div class="sub">${esc(x.st.name)}</div></div><span class="pill ${k.c}">${LBL[k.c]}</span></div>
+  <div class="grid"><div><b>Stock (dernier relevé)</b>${x.r?x.r.qty+` <span class="sub">${fb(x.r.qty)}</span>`+(k.est!==x.r.qty?`<div class="sub">≈ ${k.est} auj. (${fb(k.est)})</div>`:""):"—"}</div><div><b>Ventes moyennes/mois</b>${Math.round(x.M)}${R.obs!=null?` <span class="sub">(saisi ${Math.round(x.l.monthly||0)}, constaté ${Math.round(R.obs)})</span>`:""}</div><div><b>Couverture estimée</b>${k.cov!=null?f1(k.cov)+" mois":"—"}</div><div><b>Épuisement prévu</b>${k.out&&x.r&&x.r.qty>0?fd(k.out):"—"}</div></div>
+  <div class="msg">${esc(k.m)}</div>${x.r&&k.mDays!=null?`<div class="msg"><b>Fin du mois</b> : ${k.mDays>0?`${k.mDays} j à couvrir (≈ ${k.mNeed} unités) pour un stock estimé de ≈ ${k.est}. <span class="pill ${k.mGap>=0?"g":"r"}">${k.mGap<0?"Manque ≈ "+Math.abs(k.mGap)+" unités · "+fb(Math.abs(k.mGap)):"Surplus ≈ "+k.mGap+" unités · "+fb(k.mGap)}</span>`:"aucune vente prévue d’ici là."}${k.cd!=null&&k.est>0?` Le stock couvre encore ≈ ${k.cd} j.`:""}</div>`:""}${x.r?`<div class="sub" style="margin-top:6px">Relevé du ${fdt(x.r.ts)} — ${esc(x.r.by==="import"?"import":(S.names[x.r.by]||"collaborateur"))}</div>`:""}</div>`}).join(""):`<div class="card">Aucun élément à afficher.</div>`);
+}
+
+/* ---------- GESTION (manager uniquement) ---------- */
+function gest(){
+  if(!isOwner){
+    const stl=stSorted();
+    return historicalPanel()+`<div class="card readonly"><b>Gestion — consultation</b><p class="sub">Tu peux consulter les périodes, les magasins et les produits. Seul un manager peut modifier ces paramètres.</p></div>`+
+      (pl().length?pl().map(([id,p])=>`<div class="card readonly"><b>${esc(p.name||"Période sans nom")}</b><div class="sub">Du ${esc(p.launch||"—")} au ${esc(p.end||"—")}</div>${stl.map(([sid,st])=>{const ls=Object.values(S.lines).filter(l=>l.period===id&&l.store===sid&&S.products[l.ref]);return ls.length?`<div style="margin-top:10px"><b>${esc(st.name)}</b>${ls.sort((a,b)=>nm(S.products[a.ref]).localeCompare(nm(S.products[b.ref]),"fr")).map(l=>`<div class="row"><div style="flex:1">${esc(nm(S.products[l.ref]))}</div><span class="sub">${Math.round(l.monthly||0)} ventes/mois</span></div>`).join("")}</div>`:""}).join("")}</div>`).join(""):`<div class="card">Aucune période configurée pour le moment.</div>`);
+  }
+  const C=P(),has=!!S.periods[curP],stl=stSorted(),gs=S.stores[gStore]?gStore:(stl[0]||[""])[0];
+  const lines=Object.entries(S.lines).filter(([id,l])=>l.period===curP&&l.store===gs&&S.products[l.ref]).sort((a,b)=>nm(S.products[a[1].ref]).localeCompare(nm(S.products[b[1].ref]),"fr"));
+  const mem=S.members.filter(m=>m.id!==me);
+  return historicalPanel()+`<div class="card"><b>Période</b>`+(has?`<label>Nom</label><input value="${esc(C.name)}" onchange="setP('name',this.value)">
+  
+  <button class="btn" style="background:var(--r)" onclick="delPeriod()">Supprimer cette période</button>`:`<div class="sub">Aucune période : créez-en une ci-dessous.</div>`)+`</div>
+  <div class="card"><b>Nouvelle période</b><label>Nom (ex. Novembre 2026)</label><input value="${esc(np.name)}" oninput="np.name=this.value">
+  ${has?`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" ${np.copy?"checked":""} onchange="np.copy=this.checked"> Copier les produits et ventes de la période actuelle</label>`:""}
+  <button class="btn" onclick="newP()" ${busy?"disabled":""}>Créer la période</button></div>
+  <div class="card"><b>Magasins</b>${stl.map(([id,s])=>`<div class="row"><input value="${esc(s.name)}" onchange="renStore('${id}',this.value)"><button class="b2 d" onclick="delStore('${id}')">Supprimer</button></div>`).join("")}
+  <div class="row"><input placeholder="Nouveau magasin" value="${esc(nStore)}" oninput="nStore=this.value"><button class="b2" onclick="addStore()">Ajouter</button></div></div>
+  ${has&&stl.length?`<div class="card"><b>Produits de la période</b><label>Magasin</label><select onchange="gStore=this.value;render(true)">${stl.map(([id,s])=>`<option value="${esc(id)}" ${gs===id?"selected":""}>${esc(s.name)}</option>`).join("")}</select>
+  <div class="sub" style="margin-top:8px">Ventes moyennes/mois = valeur de départ ; elles s’ajustent ensuite aux ventes constatées.</div>
+  ${lines.map(([id,l])=>`<div class="card" style="margin:8px 0 0;padding:10px"><div class="top"><b>${esc(nm(S.products[l.ref]))}</b><button class="b2 d" onclick="delLine('${id}')">Retirer</button></div><div class="row"><input type="number" min="0" step="1" value="${esc(l.monthly)}" onchange="setLine('${id}','monthly',num(this.value)||0)" style="max-width:110px"><span class="sub">ventes / mois</span></div></div>`).join("")}
+  <div class="card" style="margin:12px 0 0;padding:10px"><b>Ajouter un produit</b><input placeholder="Nom du produit" value="${esc(nProd.name)}" oninput="nProd.name=this.value" style="margin-top:6px">
+  <div class="row"><input type="number" min="0" placeholder="Ventes moyennes / mois" value="${esc(nProd.m)}" oninput="nProd.m=this.value"></div>
+  <div class="row"><select onchange="nProd.store=this.value"><option value="">Tous les magasins</option>${stl.map(([id,s])=>`<option value="${esc(id)}" ${nProd.store===id?"selected":""}>${esc(s.name)}</option>`).join("")}</select><button class="b2" onclick="addProd()">Ajouter</button></div></div></div>`:""}
+  ${Object.keys(S.products).length?`<div class="card"><b>Catalogue des produits</b><div class="sub">Renommer ou supprimer un produit partout (lignes et relevés compris).</div>${Object.entries(S.products).sort((a,b)=>a[1].name.localeCompare(b[1].name,"fr")).map(([id,p])=>`<div class="row"><input value="${esc(p.name)}" onchange="renProd('${id}',this.value)"><button class="b2 d" onclick="delProd('${id}')">Supprimer</button></div>`).join("")}</div>`:""}
+  ${S.requests.length?`<div class="card"><b>Demandes d’accès</b>${S.requests.map((r,i)=>`<div class="top" style="margin-top:8px;align-items:center"><span>${esc(r.email)}</span><span><button class="pill g" style="border:0" onclick="okReq(${i})">Autoriser</button> <button class="pill r" style="border:0" onclick="noReq(${i})">Refuser</button></span></div>`).join("")}</div>`:""}
+  <div class="card"><b>Utilisateurs</b>${mem.length?mem.map(m=>`<div style="margin-top:10px"><div>${esc(m.name||"?")}</div><div class="row"><select onchange="setRole('${m.id}',this.value)"><option value="manager" ${m.role!=="admin"?"selected":""}>Responsable (saisie des stocks)</option><option value="admin" ${m.role==="admin"?"selected":""}>Manager (tous les droits)</option></select></div><div class="row"><button class="b2 d" onclick="delMember('${m.id}')">Révoquer l’accès</button><button class="b2 d" onclick="delUser('${m.id}')">Supprimer le compte</button></div></div>`).join(""):`<div class="sub">Aucun autre utilisateur.</div>`}
+  <label>Ajouter un utilisateur (compte déjà créé)</label><input type="email" value="${esc(memEmail)}" oninput="memEmail=this.value" placeholder="prenom@exemple.fr"><button class="btn" onclick="addMember()">Donner l’accès (Responsable)</button><div class="msg">${esc(memMsg)}</div></div>
+  <div class="card"><div class="sub">${Object.keys(S.periods).length} période(s) · ${Object.keys(S.stores).length} magasin(s) · ${Object.keys(S.products).length} produit(s) · ${S.readings.length} relevé(s) à jour</div></div>`;
+}
+async function run(fn,ok){try{await fn();await loadAll();if(ok)flash(ok)}catch(e){flash("Échec : "+(e.message||"erreur"))}}
+const setP=(k,v)=>run(()=>sb.from("stk_periods").update({[{name:"name",end:"end_date",launch:"launch_date",cover:"cover"}[k]]:v}).eq("id",curP).throwOnError());
+async function newP(){
+  if(!np.name.trim()){flash("Renseignez le nom de la période.");return}
+  busy=true;const prev=curP,cv=P().cover;
+  try{
+    const today=new Date().toISOString().slice(0,10);const {data:p}=await sb.from("stk_periods").insert({name:np.name.trim(),end_date:today,launch_date:today,cover:cv}).select("id").single().throwOnError();
+    if(np.copy&&prev){const ls=Object.values(S.lines).filter(l=>l.period===prev).map(l=>({period_id:p.id,store_id:l.store,product_id:l.ref,grp:"old",monthly:l.monthly}));if(ls.length)await sb.from("stk_lines").insert(ls).throwOnError()}
+    await loadAll();curP=p.id;np={name:"",copy:true};busy=false;flash("Période créée ✓");
+  }catch(e){busy=false;flash("Échec de la création de la période.")}
+}
+function delPeriod(){if(!confirm("Supprimer la période « "+P().name+" » et ses lignes ? Les produits et relevés restent."))return;run(async()=>{await sb.from("stk_lines").delete().eq("period_id",curP).throwOnError();await sb.from("stk_periods").delete().eq("id",curP).throwOnError();curP=""},"Période supprimée ✓")}
+async function addStore(){const n=nStore.trim();if(!n)return;nStore="";run(()=>sb.from("stk_stores").insert({name:n}).throwOnError(),"Magasin ajouté ✓")}
+const renStore=(id,n)=>n.trim()&&run(()=>sb.from("stk_stores").update({name:n.trim()}).eq("id",id).throwOnError(),"Renommé ✓");
+function delStore(id){if(!confirm("Supprimer le magasin « "+S.stores[id].name+" » avec ses lignes et ses relevés ?"))return;run(async()=>{for(const t of["stk_readings","stk_lines"])await sb.from(t).delete().eq("store_id",id).throwOnError();await sb.from("stk_stores").delete().eq("id",id).throwOnError()},"Magasin supprimé ✓")}
+async function addProd(){
+  const n=nProd.name.trim();if(!n||!curP){flash("Indiquez un nom de produit (et créez une période).");return}
+  const targets=nProd.store?[nProd.store]:Object.keys(S.stores);if(!targets.length){flash("Créez d’abord un magasin.");return}
+  const m=Math.max(0,num(nProd.m)||0),g="old";
+  run(async()=>{
+    let pid=(Object.entries(S.products).find(([id,p])=>slug(p.name)===slug(n))||[])[0];
+    if(!pid){const {data:p}=await sb.from("stk_products").insert({key:g+"-"+slug(n)+"-"+Math.random().toString(36).slice(2,6),name:n}).select("id").single().throwOnError();pid=p.id}
+    await sb.from("stk_lines").upsert(targets.map(s=>({period_id:curP,store_id:s,product_id:pid,grp:g,monthly:m})),{onConflict:"period_id,store_id,product_id"}).throwOnError();
+    nProd.name="";nProd.m="";
+  },"Produit ajouté ✓");
+}
+const setLine=(id,k,v)=>run(()=>sb.from("stk_lines").update({[k]:v}).eq("id",id).throwOnError());
+const delLine=id=>run(()=>sb.from("stk_lines").delete().eq("id",id).throwOnError(),"Ligne retirée ✓");
+const renProd=(id,n)=>n.trim()&&run(()=>sb.from("stk_products").update({name:n.trim()}).eq("id",id).throwOnError(),"Renommé ✓");
+function delProd(id){if(!confirm("Supprimer « "+nm(S.products[id])+" » avec ses lignes et ses relevés ?"))return;run(async()=>{for(const t of["stk_readings","stk_lines"])await sb.from(t).delete().eq("product_id",id).throwOnError();await sb.from("stk_products").delete().eq("id",id).throwOnError()},"Produit supprimé ✓")}
+const setRole=(id,role)=>run(()=>sb.from("stk_profiles").update({role}).eq("id",id).throwOnError(),"Droits mis à jour ✓");
+function delMember(id){const m=S.members.find(x=>x.id===id);if(!m||!confirm("Révoquer l’accès de « "+(m.name||"?")+" » ?"))return;run(()=>sb.from("stk_profiles").delete().eq("id",id).throwOnError(),"Accès révoqué ✓")}
+function delUser(id){const m=S.members.find(x=>x.id===id);if(!m||!confirm("Supprimer définitivement le compte de « "+(m.name||"?")+" » ?"))return;run(()=>sb.rpc("stk_delete_user",{p_id:id}).throwOnError(),"Compte supprimé ✓")}
+const okReq=i=>{const r=S.requests[i];r&&run(()=>sb.rpc("stk_set_member",{p_email:r.email,p_role:"manager"}).throwOnError(),"Accès accordé ✓")};
+const noReq=i=>{const r=S.requests[i];r&&run(()=>sb.from("stk_requests").delete().eq("user_id",r.user_id).throwOnError())};
+async function addMember(){const e=memEmail.trim();if(!e)return;const {error}=await sb.rpc("stk_set_member",{p_email:e,p_role:"manager"});memMsg=error?"Échec : "+error.message:"Enregistré : si le compte existe, l’accès est accordé.";if(!error)memEmail="";await loadAll();render(true)}
+
+/* ---------- Noyau ---------- */
+function render(force){
+  if(!sess){loginView();return}
+  if(view==="dash"&&!canDash)view="saisie";
+  if(view==="gest"&&!isOwner)view="saisie";
+  const sig=view==="saisie"?"s"+JSON.stringify([S.stores,S.lines,S.products,curP,S.readings.length]):Math.random();
+  if(!force&&view==="saisie"&&sig===lastSig)return;
+  lastSig=sig;
+  shell(view==="dash"?dash():view==="gest"?gest():saisie());
+}
+let sb,sess=null,started="",loginErr="",tm,memEmail="",memMsg="";
+async function loadAll(){
+  const q=t=>sb.from(t).select("*");
+  const [st,pr,ln,pe]=await Promise.all([q("stk_stores"),q("stk_products"),q("stk_lines"),q("stk_periods")]);
+  const bad=[st,pr,ln,pe].find(x=>x.error);
+  if(bad){$("#app").innerHTML=`<div class="card err">Accès aux données impossible : ${esc(bad.error.message)}</div>`;return}
+  S.stores=Object.fromEntries(st.data.map(r=>[r.id,{name:r.name}]));
+  S.products=Object.fromEntries(pr.data.map(r=>[r.id,{name:r.name,key:r.key}]));
+  S.lines=Object.fromEntries(ln.data.map(r=>[r.id,{period:r.period_id,store:r.store_id,ref:r.product_id,group:r.grp,monthly:Number(r.monthly)}]));
+  S.periods=Object.fromEntries(pe.data.map(r=>[r.id,{name:r.name,end:r.end_date,launch:r.launch_date,cover:Number(r.cover)}]));
+  const [rd,ob,hist]=await Promise.all([q("stk_latest_readings"),q("stk_obs"),q("stk_readings").order("created_at",{ascending:false}).limit(1000)]);
+  S.readings=(rd.data||[]).map(r=>({store:r.store_id,ref:r.product_id,qty:r.qty,ts:Date.parse(r.created_at),by:r.source==="import"?"import":r.user_id}));
+  S.history=(hist.error?[]:(hist.data||[])).map(r=>({store:r.store_id,ref:r.product_id,qty:Number(r.qty),ts:Date.parse(r.created_at),by:r.source==="import"?"import":r.user_id})).filter(r=>Number.isFinite(r.ts));
+  S.obs=Object.fromEntries((ob.data||[]).map(r=>[r.store_id+"__"+r.product_id,{sold:Number(r.sold),days:Number(r.days)}]));
+  if(isOwner){
+    const [pf,rq]=await Promise.all([sb.from("stk_profiles").select("id,name,role"),q("stk_requests")]);
+    S.members=pf.data||[];S.members.forEach(p=>S.names[p.id]=p.name||"Collaborateur");S.requests=rq.data||[];
+  }
+  autoP();render();
+}
+const sched=()=>{clearTimeout(tm);tm=setTimeout(loadAll,400)};
+let signup=false,loginInfo="";
+function loginView(){
+  $("#app").innerHTML=`<div class="card"><h1 style="margin-bottom:6px">Suivi des stocks</h1><label>E-mail</label><input id="em" type="email" autocomplete="username"><label>Mot de passe${signup?" (8 caractères minimum)":""}</label><input id="pw" type="password" autocomplete="${signup?"new-password":"current-password"}" onkeydown="if(event.key==='Enter')login()"><button class="btn" onclick="login()">${signup?"Créer mon compte":"Se connecter"}</button><div class="msg err">${esc(loginErr)}</div><div class="msg">${esc(loginInfo)}</div><div class="sub" style="margin-top:12px;text-align:center;cursor:pointer;text-decoration:underline" onclick="signup=!signup;loginErr='';loginInfo='';loginView()">${signup?"J’ai déjà un compte":"Créer un compte"}</div></div>`;
+}
+async function login(){
+  const em=$("#em").value.trim(),pw=$("#pw").value;
+  if(signup){
+    if(pw.length<8){loginErr="Mot de passe trop court (8 caractères minimum).";loginView();return}
+    const {data,error}=await sb.auth.signUp({email:em,password:pw});
+    if(error){loginErr="Erreur : "+error.message;loginView();return}
+    if(data.session)return;
+    signup=false;loginErr="";loginInfo="Compte créé. Si un e-mail de confirmation vous est envoyé, cliquez sur le lien, puis connectez-vous. Le manager devra valider votre accès.";loginView();return;
+  }
+  const {error}=await sb.auth.signInWithPassword({email:em,password:pw});
+  if(error){loginErr=/invalid login/i.test(error.message)?"E-mail ou mot de passe incorrect.":"Erreur : "+error.message;loginView()}
+}
+async function logout(){await sb.auth.signOut();location.reload()}
+async function start(){
+  me=sess.user.id;
+  const {data}=await sb.from("stk_profiles").select("role").eq("id",me).maybeSingle();
+  if(!data){await sb.from("stk_requests").upsert({user_id:me,email:sess.user.email},{onConflict:"user_id",ignoreDuplicates:true});$("#app").innerHTML=`<div class="card"><b>En attente de validation</b><p class="sub">Votre compte est créé. Le manager doit maintenant valider votre accès. Revenez plus tard.</p><button class="btn" onclick="logout()">Se déconnecter</button></div>`;return}
+  isOwner=data.role==="admin";canDash=isOwner||(RESP_DASH&&data.role==="manager");view=canDash?"dash":"saisie";
+  await loadAll();
+  sb.channel("rt").on("postgres_changes",{event:"*",schema:"public"},sched).subscribe();
+}
+sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+sb.auth.onAuthStateChange((e,s)=>{sess=s;if(!s){started="";loginView();return}if(started!==s.user.id){started=s.user.id;setTimeout(start,0)}});
+try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
+</script></body></html>
