@@ -49,17 +49,17 @@ const GL={old:"Fin de gamme",new:"Lancement"};
 const LBL={r:"Rupture",a:"Rupture prévue",o:"Surstock",g:"OK",n:"Stock non relevé"};
 const SH={r:"Rupture",a:"Prévue",o:"Surstock",g:"OK",n:"N/R"};
 const ORD={r:0,a:1,o:2,n:3,g:4};
-const DAY=864e5,TOL=7,BAC=70,ALERT_D=10,RESP_DASH=true; // RESP_DASH=true : les responsables voient aussi le tableau de bord
-const S={stores:{},products:{},lines:{},readings:[],names:{},periods:{},obs:{},members:[],requests:[]};
+const DAY=864e5,TOL=7,BAC=70,ALERT_D=10,YK_OK_H=26; // Saisie masquée si la synchro Yokitup a réussi il y a moins de YK_OK_H heures
+const S={stores:{},products:{},lines:{},readings:[],names:{},periods:{},obs:{},pos:{},members:[],requests:[]};
 let curP="",np={name:"",end:"",launch:"",copy:true},nProd={name:"",group:"old",m:"",store:""},nStore="",gStore="";
 const pl=()=>Object.entries(S.periods).sort((a,b)=>a[1].launch<b[1].launch?-1:1);
 const P=()=>Object.assign({name:"",end:"2026-11-30",launch:"2026-12-01",cover:1},S.periods[curP]||{});
 function autoP(){const a=pl();if(!a.length){curP="";return}if(S.periods[curP])return;const lim=new Date(Date.now()-30*DAY).toISOString().slice(0,10);curP=(a.find(x=>x[1].launch>=lim)||a[a.length-1])[0]}
 const psel=()=>`<div class="card"><label style="margin-top:0">Période</label><select onchange="curP=this.value;render(true)">${pl().map(x=>`<option value="${esc(x[0])}" ${curP===x[0]?"selected":""}>${esc(x[1].name)}</option>`).join("")}</select></div>`;
-let user,me=null,canDash=false,isOwner=false,view="saisie",fStore="",fCol="",lastSig="",toast="",recent=[],busy=false,bulk={};
+let user,me=null,canDash=false,isOwner=false,ykOk=false,view="saisie",fStore="",fCol="",lastSig="",toast="",recent=[],busy=false,bulk={};
 let sel={store:""};
 try{sel.store=localStorage.getItem("magasin")||""}catch(e){}
-const slug=s=>String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const slug=s=>String(s).replace(/œ/g,"oe").replace(/Œ/g,"OE").replace(/æ/g,"ae").replace(/Æ/g,"AE").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const fd=t=>new Date(t).toLocaleDateString("fr-FR");
 const fdt=t=>new Date(t).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"});
 const f1=n=>n.toFixed(1).replace(".",",");
@@ -70,7 +70,10 @@ const stSorted=()=>Object.entries(S.stores).sort((a,b)=>a[1].name.localeCompare(
 
 function latest(){const m={};for(const r of S.readings){const k=r.store+"__"+r.ref;if(!m[k]||r.ts>m[k].ts)m[k]=r}return m}
 // Moyenne mensuelle : base saisie par le manager, corrigée par les ventes réellement constatées (baisses de stock entre relevés, 90 derniers jours)
-function rate(l){const o=S.obs[l.store+"__"+l.ref],b=l.monthly||0;if(!o||o.days<TOL)return{m:b,obs:null};const ob=o.sold/o.days*30,w=Math.min(1,o.days/60);return{m:b>0?w*ob+(1-w)*b:ob,obs:ob}}
+// Produits reliés à Yokitup : ventes caisse (POS) à la place des baisses de stock ; les pertes sont suivies à part, hors calcul.
+function rate(l){const k=l.store+"__"+l.ref,b=l.monthly||0,p=S.pos[k];
+  if(p&&p.days>=TOL){const ob=p.sold/p.days*30,w=Math.min(1,p.days/60);return{m:b>0?w*ob+(1-w)*b:ob,obs:ob,pos:true}}
+  const o=S.obs[k];if(!o||o.days<TOL)return{m:b,obs:null};const ob=o.sold/o.days*30,w=Math.min(1,o.days/60);return{m:b>0?w*ob+(1-w)*b:ob,obs:ob}}
 function calc(l,r,now,M){
   if(!r)return{c:"n",m:"Aucun relevé pour le moment."};
   const q=r.qty,C=P(),isNew=l.group==="new",L0=Date.parse(C.launch),t0=r.ts||now,st=isNew?Math.max(t0,L0):t0;
@@ -101,11 +104,13 @@ function calc(l,r,now,M){
 }
 
 function shell(body){
-  const tabs=[];if(canDash)tabs.push(["dash","Tableau de bord"]);tabs.push(["saisie","Saisie"]);if(isOwner)tabs.push(["gest","Gestion"]);
+  const tabs=[];if(canDash)tabs.push(["dash","Tableau de bord"]);if(canSaisie())tabs.push(["saisie","Saisie"]);if(isOwner)tabs.push(["gest","Gestion"]);
   $("#app").innerHTML=`<header><h1>Suivi des stocks</h1><span><span class="role">${isOwner?"Manager":"Responsable"}</span> <button class="role" style="border:0;font:inherit;font-size:12px" onclick="logout()">Quitter</button></span></header>`+
    (tabs.length>1?`<nav>${tabs.map(t=>`<button class="${view==t[0]?"on":""}" onclick="go('${t[0]}')">${t[1]}</button>`).join("")}</nav>`:"")+(isOwner&&view!=="saisie"&&pl().length>1?psel():"")+body+(toast?`<div class="toast">${esc(toast)}</div>`:"");
 }
 function go(v){view=v;render(true)}
+// Saisie : administrateurs uniquement, et seulement si la connexion Yokitup ne fonctionne pas
+const canSaisie=()=>isOwner&&!ykOk;
 
 /* ---------- SAISIE (mise à jour groupée) ---------- */
 function saisie(){
@@ -147,6 +152,7 @@ function dash(){
   const now=Date.now(),L=latest(),rows=[],C=P();
   for(const l of Object.values(S.lines)){
     if(l.period!==curP)continue;const p=S.products[l.ref];if(!p)continue;const r=L[l.store+"__"+l.ref],R=rate(l);
+    if(!r)continue; // empanada pas encore rentrée : on ne l’affiche pas
     rows.push({l,p,r,R,M:R.m,st:S.stores[l.store]||{name:l.store},k:calc(l,r,now,R.m)});
   }
   const base=rows.filter(x=>!fStore||x.l.store===fStore);
@@ -161,8 +167,8 @@ function dash(){
   <div class="chips">${["r","a","o","g","n"].map(c=>`<span class="chip ${c} ${fCol===c?"on":""}" onclick="fCol=fCol==='${c}'?'':'${c}';render(true)">${LBL[c]} · ${cnt[c]}</span>`).join("")}</div></div>`+
   (sy.length?`<div class="card x"><b>Synthèse par produit</b><table><tr><th>Produit</th><th>Stock</th><th>Ventes/mois</th><th>Couv.</th><th>Fin du mois</th><th></th></tr>${sy.map(s=>`<tr><td>${esc(nm(s.p))}<div class="sub">${GL[s.g]} · ${s.n}/${s.t} relevés${s.rup?` · <b style="color:var(--r)">${s.rup} en rupture</b>`:""}</div></td><td>${s.n?s.q:"—"}<div class="sub">${s.n?fb(s.q):""}</div></td><td>${s.n?Math.round(s.M):"—"}</td><td>${s.n&&s.M>0?f1(s.e/s.M)+" m":"—"}</td><td style="color:var(--${s.mg>=0?"g":"r"})">${s.n?(s.mg>=0?"+":"")+s.mg:"—"}</td><td><span class="pill ${s.c}">${SH[s.c]}</span></td></tr>`).join("")}</table></div>`:"")+
   (list.length?list.map(x=>{const k=x.k,R=x.R;return `<div class="card it ${k.c}"><div class="top"><div><b>${esc(nm(x.p))}</b><div class="sub">${GL[x.l.group]} · ${esc(x.st.name)}</div></div><span class="pill ${k.c}">${LBL[k.c]}</span></div>
-  <div class="grid"><div><b>Stock (dernier relevé)</b>${x.r?x.r.qty+` <span class="sub">${fb(x.r.qty)}</span>`+(k.est!==x.r.qty?`<div class="sub">≈ ${k.est} auj. (${fb(k.est)})</div>`:""):"—"}</div><div><b>Ventes moyennes/mois</b>${Math.round(x.M)}${R.obs!=null?` <span class="sub">(saisi ${Math.round(x.l.monthly||0)}, constaté ${Math.round(R.obs)})</span>`:""}</div><div><b>Couverture estimée</b>${k.cov!=null?f1(k.cov)+" mois":"—"}</div><div><b>Épuisement prévu</b>${k.out&&x.r&&x.r.qty>0?fd(k.out):"—"}</div></div>
-  <div class="msg">${esc(k.m)}</div>${x.r&&k.mDays!=null?`<div class="msg"><b>Fin du mois</b> : ${k.mDays>0?`${k.mDays} j à couvrir (≈ ${k.mNeed} unités) pour un stock estimé de ≈ ${k.est}. <span class="pill ${k.mGap>=0?"g":"r"}">${k.mGap>=0?"Suffisant (+"+k.mGap+")":"Insuffisant ("+k.mGap+")"}</span>`:"aucune vente prévue d’ici là."}${k.cd!=null&&k.est>0?` Le stock couvre encore ≈ ${k.cd} j.`:""}</div>`:""}${x.r?`<div class="sub" style="margin-top:6px">Relevé du ${fdt(x.r.ts)} — ${esc(x.r.by==="import"?"import":(S.names[x.r.by]||"collaborateur"))}</div>`:""}</div>`}).join(""):`<div class="card">Aucun élément à afficher.</div>`);
+  <div class="grid"><div><b>Stock (dernier relevé)</b>${x.r?x.r.qty+` <span class="sub">${fb(x.r.qty)}</span>`+(k.est!==x.r.qty?`<div class="sub">≈ ${k.est} auj. (${fb(k.est)})</div>`:""):"—"}</div><div><b>Ventes moyennes/mois</b>${Math.round(x.M)}${R.obs!=null?` <span class="sub">(saisi ${Math.round(x.l.monthly||0)}, ${R.pos?"caisse":"constaté"} ${Math.round(R.obs)})</span>`:""}</div><div><b>Couverture estimée</b>${k.cov!=null?f1(k.cov)+" mois":"—"}</div><div><b>Épuisement prévu</b>${k.out&&x.r&&x.r.qty>0?fd(k.out):"—"}</div></div>
+  <div class="msg">${esc(k.m)}</div>${x.r&&k.mDays!=null?`<div class="msg"><b>Fin du mois</b> : ${k.mDays>0?`${k.mDays} j à couvrir (≈ ${k.mNeed} unités) pour un stock estimé de ≈ ${k.est}. <span class="pill ${k.mGap>=0?"g":"r"}">${k.mGap>=0?"Suffisant (+"+k.mGap+")":"Insuffisant ("+k.mGap+")"}</span>`:"aucune vente prévue d’ici là."}${k.cd!=null&&k.est>0?` Le stock couvre encore ≈ ${k.cd} j.`:""}</div>`:""}${x.r?`<div class="sub" style="margin-top:6px">Relevé du ${fdt(x.r.ts)} — ${esc(x.r.by==="import"?"import":x.r.by==="yokitup"?"Yokitup":(S.names[x.r.by]||"collaborateur"))}</div>`:""}</div>`}).join(""):`<div class="card">Aucun élément à afficher.</div>`);
 }
 
 /* ---------- GESTION (manager uniquement) ---------- */
@@ -212,12 +218,23 @@ async function addProd(){
   const n=nProd.name.trim();if(!n||!curP){flash("Indiquez un nom de produit (et créez une période).");return}
   const targets=nProd.store?[nProd.store]:Object.keys(S.stores);if(!targets.length){flash("Créez d’abord un magasin.");return}
   const m=Math.max(0,num(nProd.m)||0),g=nProd.group;
-  run(async()=>{
-    let pid=(Object.entries(S.products).find(([id,p])=>slug(p.name)===slug(n))||[])[0];
+  let pid;
+  await run(async()=>{
+    pid=(Object.entries(S.products).find(([id,p])=>slug(p.name)===slug(n))||[])[0];
     if(!pid){const {data:p}=await sb.from("stk_products").insert({key:g+"-"+slug(n)+"-"+Math.random().toString(36).slice(2,6),name:n}).select("id").single().throwOnError();pid=p.id}
     await sb.from("stk_lines").upsert(targets.map(s=>({period_id:curP,store_id:s,product_id:pid,grp:g,monthly:m})),{onConflict:"period_id,store_id,product_id"}).throwOnError();
     nProd.name="";nProd.m="";
   },"Produit ajouté ✓");
+  if(pid)ykLink(pid,n);
+}
+// Empanada ajoutée à la période : liaison Yokitup immédiate (stock + ventes caisse), sans attendre la synchro planifiée
+async function ykLink(pid,n){
+  toast="Liaison de « "+n+" » avec Yokitup…";render(true);
+  try{
+    const {error}=await sb.functions.invoke("yokitup-sync",{body:{}});if(error)throw error;
+    await loadAll();
+    flash(Object.keys(S.pos).some(k=>k.endsWith("__"+pid))?"« "+n+" » reliée à Yokitup ✓":"« "+n+" » introuvable dans Yokitup (nom différent ou produit non suivi à la pièce).");
+  }catch(e){flash("Liaison Yokitup impossible pour l’instant : elle sera faite à la prochaine synchro.")}
 }
 const setLine=(id,k,v)=>run(()=>sb.from("stk_lines").update({[k]:v}).eq("id",id).throwOnError());
 const delLine=id=>run(()=>sb.from("stk_lines").delete().eq("id",id).throwOnError(),"Ligne retirée ✓");
@@ -233,7 +250,7 @@ async function addMember(){const e=memEmail.trim();if(!e)return;const {error}=aw
 /* ---------- Noyau ---------- */
 function render(force){
   if(!sess){loginView();return}
-  if(view==="gest"&&!isOwner)view="saisie";if(view==="dash"&&!canDash)view="saisie";
+  if(view==="gest"&&!isOwner)view="dash";if(view==="saisie"&&!canSaisie())view="dash";
   const sig=view==="saisie"?"s"+JSON.stringify([S.stores,S.lines,S.products,curP,S.readings.length]):Math.random();
   if(!force&&view==="saisie"&&sig===lastSig)return;
   lastSig=sig;
@@ -249,8 +266,13 @@ async function loadAll(){
   S.products=Object.fromEntries(pr.data.map(r=>[r.id,{name:r.name,key:r.key}]));
   S.lines=Object.fromEntries(ln.data.map(r=>[r.id,{period:r.period_id,store:r.store_id,ref:r.product_id,group:r.grp,monthly:Number(r.monthly)}]));
   S.periods=Object.fromEntries(pe.data.map(r=>[r.id,{name:r.name,end:r.end_date,launch:r.launch_date,cover:Number(r.cover)}]));
-  const [rd,ob]=await Promise.all([q("stk_latest_readings"),q("stk_obs")]);
-  S.readings=(rd.data||[]).map(r=>({store:r.store_id,ref:r.product_id,qty:r.qty,ts:Date.parse(r.created_at),by:r.source==="import"?"import":r.user_id}));
+  const [rd,ob,po,ys]=await Promise.all([q("stk_latest_readings"),q("stk_obs"),q("stk_pos_rate"),sb.from("stk_yk_state").select("last_sync,last_error").eq("id",1).maybeSingle()]);
+  S.pos=Object.fromEntries((po.data||[]).map(r=>[r.store_id+"__"+r.product_id,{sold:Number(r.sold),days:Number(r.days)}]));
+  // Stock Yokitup inchangé depuis le dernier relevé : il reste valable jusqu'à la dernière synchro
+  const ls=ys.data&&ys.data.last_sync?Date.parse(ys.data.last_sync):0;
+  ykOk=!!ls&&!ys.data.last_error&&Date.now()-ls<YK_OK_H*36e5;
+  S.readings=(rd.data||[]).map(r=>{const ts=Date.parse(r.created_at),y=r.source==="yokitup"&&S.pos[r.store_id+"__"+r.product_id];
+    return {store:r.store_id,ref:r.product_id,qty:r.qty,ts:y&&ls>ts?ls:ts,by:r.source==="import"?"import":r.source==="yokitup"?"yokitup":r.user_id}});
   S.obs=Object.fromEntries((ob.data||[]).map(r=>[r.store_id+"__"+r.product_id,{sold:Number(r.sold),days:Number(r.days)}]));
   if(isOwner){
     const [pf,rq]=await Promise.all([sb.from("stk_profiles").select("id,name,role"),q("stk_requests")]);
@@ -280,7 +302,7 @@ async function start(){
   me=sess.user.id;
   const {data}=await sb.from("stk_profiles").select("role").eq("id",me).maybeSingle();
   if(!data){await sb.from("stk_requests").upsert({user_id:me,email:sess.user.email},{onConflict:"user_id",ignoreDuplicates:true});$("#app").innerHTML=`<div class="card"><b>En attente de validation</b><p class="sub">Votre compte est créé. Le manager doit maintenant valider votre accès. Revenez plus tard.</p><button class="btn" onclick="logout()">Se déconnecter</button></div>`;return}
-  isOwner=data.role==="admin";canDash=isOwner||(RESP_DASH&&data.role==="manager");view=canDash?"dash":"saisie";
+  isOwner=data.role==="admin";canDash=true;view="dash";
   await loadAll();
   sb.channel("rt").on("postgres_changes",{event:"*",schema:"public"},sched).subscribe();
 }
