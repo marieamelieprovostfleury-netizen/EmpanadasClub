@@ -49,7 +49,7 @@ const GL={old:"Fin de gamme",new:"Lancement"};
 const LBL={r:"Rupture",a:"Rupture prévue",o:"Surstock",g:"OK",n:"Stock non relevé"};
 const SH={r:"Rupture",a:"Prévue",o:"Surstock",g:"OK",n:"N/R"};
 const ORD={r:0,a:1,o:2,n:3,g:4};
-const DAY=864e5,TOL=7,BAC=70,ALERT_D=10,RESP_DASH=false; // RESP_DASH=true : les responsables voient aussi le tableau de bord
+const DAY=864e5,TOL=7,BAC=70,ALERT_D=10,RESP_DASH=true; // RESP_DASH=true : les responsables voient aussi le tableau de bord
 const S={stores:{},products:{},lines:{},readings:[],names:{},periods:{},obs:{},members:[],requests:[]};
 let curP="",np={name:"",end:"",launch:"",copy:true},nProd={name:"",group:"old",m:"",store:""},nStore="",gStore="";
 const pl=()=>Object.entries(S.periods).sort((a,b)=>a[1].launch<b[1].launch?-1:1);
@@ -102,7 +102,7 @@ function calc(l,r,now,M){
 
 function shell(body){
   const tabs=[];if(canDash)tabs.push(["dash","Tableau de bord"]);tabs.push(["saisie","Saisie"]);if(isOwner)tabs.push(["gest","Gestion"]);
-  $("#app").innerHTML=`<header><h1>Suivi des stocks</h1><span><span class="role">${isOwner?"Manager":"Responsable"}</span> <button class="role" style="border:0;font:inherit;font-size:12px" onclick="logout()">Quitter</button></span></header>`+
+  $("#app").innerHTML=`<header><h1>Suivi des stocks <span class="sub" style="font-weight:400">v4</span></h1><span><span class="role">${isOwner?"Admin":"Manager"}</span> <button class="role" style="border:0;font:inherit;font-size:12px" onclick="logout()">Quitter</button></span></header>`+
    (tabs.length>1?`<nav>${tabs.map(t=>`<button class="${view==t[0]?"on":""}" onclick="go('${t[0]}')">${t[1]}</button>`).join("")}</nav>`:"")+(isOwner&&view!=="saisie"&&pl().length>1?psel():"")+body+(toast?`<div class="toast">${esc(toast)}</div>`:"");
 }
 function go(v){view=v;render(true)}
@@ -111,7 +111,7 @@ function go(v){view=v;render(true)}
 function saisie(){
   const st=stSorted(),L=latest();
   const ps=Object.values(S.lines).filter(l=>l.store===sel.store&&l.period===curP&&S.products[l.ref]);
-  if(!st.length)return `<div class="card">Aucun magasin pour l’instant.${isOwner?" Créez-en un dans l’onglet « Gestion ».":" Demandez au manager de configurer l’application."}</div>`;
+  if(!st.length)return `<div class="card">Aucun magasin pour l’instant.${isOwner?" Créez-en un dans l’onglet « Gestion ».":" Demandez à l’admin de configurer l’application."}</div>`;
   const b=bulk[sel.store]||{};
   const grp=g=>{const a=ps.filter(l=>l.group===g).sort((x,y)=>nm(S.products[x.ref]).localeCompare(nm(S.products[y.ref]),"fr"));
     return a.length?`<div class="sub" style="margin-top:14px"><b>${GL[g]}</b></div>`+a.map(l=>{const r=L[l.store+"__"+l.ref],v=b[l.ref]??"";
@@ -189,8 +189,8 @@ function gest(){
   <div class="row"><select onchange="nProd.store=this.value"><option value="">Tous les magasins</option>${stl.map(([id,s])=>`<option value="${esc(id)}" ${nProd.store===id?"selected":""}>${esc(s.name)}</option>`).join("")}</select><button class="b2" onclick="addProd()">Ajouter</button></div></div></div>`:""}
   ${Object.keys(S.products).length?`<div class="card"><b>Catalogue des produits</b><div class="sub">Renommer ou supprimer un produit partout (lignes et relevés compris).</div>${Object.entries(S.products).sort((a,b)=>a[1].name.localeCompare(b[1].name,"fr")).map(([id,p])=>`<div class="row"><input value="${esc(p.name)}" onchange="renProd('${id}',this.value)"><button class="b2 d" onclick="delProd('${id}')">Supprimer</button></div>`).join("")}</div>`:""}
   ${S.requests.length?`<div class="card"><b>Demandes d’accès</b>${S.requests.map((r,i)=>`<div class="top" style="margin-top:8px;align-items:center"><span>${esc(r.email)}</span><span><button class="pill g" style="border:0" onclick="okReq(${i})">Autoriser</button> <button class="pill r" style="border:0" onclick="noReq(${i})">Refuser</button></span></div>`).join("")}</div>`:""}
-  <div class="card"><b>Utilisateurs</b>${mem.length?mem.map(m=>`<div style="margin-top:10px"><div>${esc(m.name||"?")}</div><div class="row"><select onchange="setRole('${m.id}',this.value)"><option value="manager" ${m.role!=="admin"?"selected":""}>Responsable (saisie des stocks)</option><option value="admin" ${m.role==="admin"?"selected":""}>Manager (tous les droits)</option></select></div><div class="row"><button class="b2 d" onclick="delMember('${m.id}')">Révoquer l’accès</button><button class="b2 d" onclick="delUser('${m.id}')">Supprimer le compte</button></div></div>`).join(""):`<div class="sub">Aucun autre utilisateur.</div>`}
-  <label>Ajouter un utilisateur (compte déjà créé)</label><input type="email" value="${esc(memEmail)}" oninput="memEmail=this.value" placeholder="prenom@exemple.fr"><button class="btn" onclick="addMember()">Donner l’accès (Responsable)</button><div class="msg">${esc(memMsg)}</div></div>
+  <div class="card"><b>Utilisateurs</b>${mem.length?mem.map(m=>`<div style="margin-top:10px"><div>${esc(m.name||"?")}</div><div class="row"><select onchange="setRole('${m.id}',this.value)"><option value="manager" ${m.role!=="admin"?"selected":""}>Manager (saisie + tableau de bord)</option><option value="admin" ${m.role==="admin"?"selected":""}>Admin (tous les droits)</option></select></div><div class="row"><button class="b2 d" onclick="delMember('${m.id}')">Révoquer l’accès</button><button class="b2 d" onclick="delUser('${m.id}')">Supprimer le compte</button></div></div>`).join(""):`<div class="sub">Aucun autre utilisateur.</div>`}
+  <label>Ajouter un utilisateur (compte déjà créé)</label><input type="email" value="${esc(memEmail)}" oninput="memEmail=this.value" placeholder="prenom@exemple.fr"><button class="btn" onclick="addMember()">Donner l’accès (Manager)</button><div class="msg">${esc(memMsg)}</div></div>
   <div class="card"><div class="sub">${Object.keys(S.periods).length} période(s) · ${Object.keys(S.stores).length} magasin(s) · ${Object.keys(S.products).length} produit(s) · ${S.readings.length} relevé(s) à jour</div></div>`;
 }
 async function run(fn,ok){try{await fn();await loadAll();if(ok)flash(ok)}catch(e){flash("Échec : "+(e.message||"erreur"))}}
@@ -270,7 +270,7 @@ async function login(){
     const {data,error}=await sb.auth.signUp({email:em,password:pw});
     if(error){loginErr="Erreur : "+error.message;loginView();return}
     if(data.session)return;
-    signup=false;loginErr="";loginInfo="Compte créé. Si un e-mail de confirmation vous est envoyé, cliquez sur le lien, puis connectez-vous. Le manager devra valider votre accès.";loginView();return;
+    signup=false;loginErr="";loginInfo="Compte créé. Si un e-mail de confirmation vous est envoyé, cliquez sur le lien, puis connectez-vous. L’admin devra valider votre accès.";loginView();return;
   }
   const {error}=await sb.auth.signInWithPassword({email:em,password:pw});
   if(error){loginErr=/invalid login/i.test(error.message)?"E-mail ou mot de passe incorrect.":"Erreur : "+error.message;loginView()}
@@ -279,8 +279,8 @@ async function logout(){await sb.auth.signOut();location.reload()}
 async function start(){
   me=sess.user.id;
   const {data}=await sb.from("stk_profiles").select("role").eq("id",me).maybeSingle();
-  if(!data){await sb.from("stk_requests").upsert({user_id:me,email:sess.user.email},{onConflict:"user_id",ignoreDuplicates:true});$("#app").innerHTML=`<div class="card"><b>En attente de validation</b><p class="sub">Votre compte est créé. Le manager doit maintenant valider votre accès. Revenez plus tard.</p><button class="btn" onclick="logout()">Se déconnecter</button></div>`;return}
-  isOwner=data.role==="admin";canDash=isOwner||(RESP_DASH&&data.role==="manager");view=canDash?"dash":"saisie";
+  if(!data){await sb.from("stk_requests").upsert({user_id:me,email:sess.user.email},{onConflict:"user_id",ignoreDuplicates:true});$("#app").innerHTML=`<div class="card"><b>En attente de validation</b><p class="sub">Votre compte est créé. L’admin doit maintenant valider votre accès. Revenez plus tard.</p><button class="btn" onclick="logout()">Se déconnecter</button></div>`;return}
+  const rl=String(data.role||"").toLowerCase();isOwner=rl==="admin";canDash=isOwner||RESP_DASH;view=canDash?"dash":"saisie";
   await loadAll();
   sb.channel("rt").on("postgres_changes",{event:"*",schema:"public"},sched).subscribe();
 }
