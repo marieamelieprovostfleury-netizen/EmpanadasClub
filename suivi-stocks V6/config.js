@@ -1,1 +1,0 @@
-const SUPABASE_URL="https://kmshcmomtrusyeykplfl.supabase.co", SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imttc2hjbW9tdHJ1c3lleWtwbGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyODUwNzksImV4cCI6MjEwODg2MTA3OX0.saf0dj-p9GRVF_5EeBmZt-aBdgjlN8E9Ig4mdR4wIx8";
